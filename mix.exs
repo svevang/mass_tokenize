@@ -1,9 +1,9 @@
-defmodule WikiExtract.MixProject do
+defmodule MassTokenize.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :wiki_extract,
+      app: :mass_tokenize,
       version: "0.1.0",
       elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
@@ -21,9 +21,9 @@ defmodule WikiExtract.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:sweet_xml, "~>0.6"}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
+      {:exprof, "~> 0.2.0"},
+      {:poison, "~> 3.1"},
+      {:tokenize, github: "svevang/elixir-tokenize"}
     ]
   end
 end

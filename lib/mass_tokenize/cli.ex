@@ -1,4 +1,4 @@
-defmodule WikiExtract.CLI do
+defmodule MassTokenize.CLI do
 
   @moduledoc """
   Handle the command line parsing and the dispatch to the functions that will
@@ -22,23 +22,31 @@ defmodule WikiExtract.CLI do
 
   def process(:help) do
     IO.puts """
-      Usage: wiki_extract --path <some/textfile>
+    Usage:
+
+      Tokenize a text file or directory: $ mass_tokenize --path <some/path>
+      Print this help:                   $ mass_tokenize --help
+
+    Options:
+
+    --json-lines  Assume the input format is wikiextract line-oriented json objects
+
     """
   end
 
   def process([path: some_path]) do
-    WikiExtract.parse_file([path: some_path])
+    MassTokenize.parse_file([path: some_path])
   end
 
   def parse_args(argv) do
 
-    parse = OptionParser.parse(argv, switches: [help: :boolean, path: :string], aliases:  [h: :help])
+    parse = OptionParser.parse(argv, switches: [help: :boolean, json_lines: :boolean, path: :string], aliases:  [h: :help])
 
     case parse do
       {[help: true], _,  _ }
         -> :help
-      {[path: file_path ], _, _}
-        -> [ path: file_path ]
+      {[path: file_path, json_lines: wikiextract_format ], _, _}
+        -> [ path: file_path,  json_lines: wikiextract_format ]
       _
         -> :help
     end

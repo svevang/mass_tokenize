@@ -10,11 +10,11 @@ use Mix.Config
 
 # You can configure your application as:
 #
-#     config :wiki_extract, key: :value
+#     config :mass_tokenize, key: :value
 #
 # and access this configuration in your application as:
 #
-#     Application.get_env(:wiki_extract, :key)
+#     Application.get_env(:mass_tokenize, :key)
 #
 # You can also configure a 3rd-party app:
 #
