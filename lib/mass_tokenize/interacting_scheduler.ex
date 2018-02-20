@@ -1,41 +1,74 @@
 defmodule InteractingScheduler do
   @moduledoc """
-  A schedular that returns values to the caller, allowing the caller to modify
-  parameters based on another schedular.
+  A scheduler that allows the client to modify
+  parameters based on another scheduler.
   """
 
+  require Logger
+
+  @enforce_keys [:client_pid, :module, :processes, :busy_processes, :queue]
+  defstruct @enforce_keys
+
   def run(client_pid, num_processes, module, func, queue) do
-    busy_processes = (1..num_processes)
-    |> Enum.map(fn(_) -> spawn(module, func, [self()]) end)
-
-    schedule_processes(client_pid, MapSet.new(busy_processes), MapSet.new,  queue)
-
+    spawn_link(InteractingScheduler, :setup_queues, [client_pid, num_processes, module, func, queue])
   end
 
-  def schedule_processes(client_pid, processes, busy_processes, queue) do
+  def setup_queues(client_pid, num_processes, module, func, queue) do
+    processes = (1..num_processes)
+    |> Enum.map(fn(_) -> spawn(module, func, [self()]) end)
 
-    avail_workers = MapSet.difference(processes, busy_processes)
+    scheduler = %InteractingScheduler{
+      client_pid: client_pid,
+      module: module,
+      processes: MapSet.new(processes),
+      busy_processes: MapSet.new,
+      queue: queue
+    }
 
-    work_batch = Enum.take(queue, MapSet.size(avail_workers))
-    queue = Enum.drop(queue, length(work_batch))
+    InteractingScheduler.schedule_processes(scheduler)
+  end
 
-    avail_workers
+  def schedule_processes(scheduler = %InteractingScheduler{}) do
+
+    Logger.info("[InteractingScheduler] setting up work for #{scheduler.module}, queue length: #{length(scheduler.queue)}")
+
+    avail_workers = MapSet.difference(scheduler.processes, scheduler.busy_processes)
+
+    work_batch = Enum.take(scheduler.queue, MapSet.size(avail_workers))
+    scheduler = %{ scheduler | queue: Enum.drop(scheduler.queue, length(work_batch)) }
+
+    # Because we can add work after the queue is drained,
+    # keep track of availible workers.
+    # Gather a list of workers that will be assigned work:
+    {used_pids, _} = avail_workers
     |> Enum.zip(work_batch)
-    |> Enum.each(fn(zipped)->
+    |> Enum.map(fn(zipped)->
       {pid, work_item} = zipped
-      IO.puts("Sending #{work_item} to #{inspect(pid)}")
       send pid, {:work, work_item, self()}
+      zipped
     end)
+    |> Enum.unzip
 
-    busy_processes = MapSet.union(busy_processes, avail_workers)
+    scheduler = %{ scheduler | busy_processes: MapSet.union(scheduler.busy_processes, MapSet.new(used_pids)) }
 
     receive do
-      {:ready, worker_pid} when length(queue) > 0 ->
-        schedule_processes(client_pid, processes, MapSet.delete(busy_processes, worker_pid), queue)
-      {:answer, result, worker_pid} when length(queue) == 0 ->
-        Enum.each(processes, fn(pid) -> send(pid, :shutdown) end)
       {:answer, result, worker_pid} ->
-        schedule_processes(client_pid, processes, MapSet.delete(busy_processes, worker_pid), queue)
+        Logger.info("[InteractingScheduler] answer from #{scheduler.module}")
+
+        scheduler = %{ scheduler | busy_processes: MapSet.delete(scheduler.busy_processes, worker_pid) }
+        send scheduler.client_pid, {:answer, scheduler.module, result}
+        if MapSet.size(scheduler.busy_processes) == 0 and length(scheduler.queue) == 0  do
+          send scheduler.client_pid, {:queue_drain, scheduler.module}
+        end
+        schedule_processes(scheduler)
+      {:push_queue, work_item} ->
+        Logger.info("[InteractingScheduler] pushed work for #{scheduler.module}")
+        scheduler = %{ scheduler | queue: [work_item | scheduler.queue] }
+        schedule_processes(scheduler)
+      #anything ->
+        #Logger.info("[InteractingScheduler] received #{inspect(anything)}")
+        #schedule_processes(scheduler)
+
     end
 
   end

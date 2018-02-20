@@ -33,7 +33,7 @@ defmodule MassTokenize.CLI do
   end
 
   def process([path: some_path, wikiextractor_json: wikiextractor_json]) do
-    MassTokenize.parse_file([path: some_path, wikiextractor_json: wikiextractor_json])
+    MassTokenize.tokenize_text_files([path: some_path, wikiextractor_json: wikiextractor_json])
   end
 
   def parse_args(argv) do
