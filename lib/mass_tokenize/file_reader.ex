@@ -3,12 +3,12 @@ defmodule FileReader do
   A task for the InteractingScheduler: Read a file from disk.
   """
 
-  def read_text(scheduler) do
-    send scheduler, {:ready, self() }
+  def read_text(client, uid) do
+    send client, {:ready, self() }
     receive do
       {:work, path, client} ->
-        send client, {:answer, read_file(path), self() }
-        read_text(scheduler)
+        send client, {:answer, uid, read_file(path), self() }
+        read_text(client, uid)
       { :shutdown } ->
         exit(:normal)
     end

@@ -6,31 +6,53 @@ defmodule InteractingScheduler do
 
   require Logger
 
-  @enforce_keys [:client_pid, :module, :processes, :busy_processes, :queue]
+  @enforce_keys [:client_pid, :module, :uid, :processes, :busy_processes, :queue]
   defstruct @enforce_keys
 
   def run(client_pid, num_processes, module, func, queue) do
-    spawn_link(InteractingScheduler, :setup_queues, [client_pid, num_processes, module, func, queue])
+    InteractingScheduler.setup_queues(client_pid, num_processes, module, gen_key(), func, queue)
   end
 
-  def setup_queues(client_pid, num_processes, module, func, queue) do
+  defp gen_key(length \\ 32) do
+    :crypto.strong_rand_bytes(length) |> Base.url_encode64 |> binary_part(0, length)
+  end
+
+  def setup_queues(client_pid, num_processes, module, uid, func, queue) do
     processes = (1..num_processes)
-    |> Enum.map(fn(_) -> spawn(module, func, [self()]) end)
+    |> Enum.map(fn(_) -> spawn(module, func, [self(), uid]) end)
 
     scheduler = %InteractingScheduler{
       client_pid: client_pid,
       module: module,
+      uid: uid,
       processes: MapSet.new(processes),
       busy_processes: MapSet.new,
       queue: queue
     }
 
-    InteractingScheduler.schedule_processes(scheduler)
+    scheduler
+  end
+
+  def queue_drained?(scheduler = %InteractingScheduler{}) do
+    MapSet.size(scheduler.busy_processes) == 0 and length(scheduler.queue) == 0
+  end
+
+  def receive_answer(scheduler = %InteractingScheduler{}, result, worker_pid) do
+    Logger.debug("[InteractingScheduler] answer from #{scheduler.module}")
+
+    scheduler = %{ scheduler | busy_processes: MapSet.delete(scheduler.busy_processes, worker_pid) }
+
+    scheduler
+  end
+
+  def push_queue(scheduler = %InteractingScheduler{}, work_item) do
+    Logger.debug("[InteractingScheduler] pushed work for #{scheduler.module}")
+    %{ scheduler | queue: [work_item | scheduler.queue] }
   end
 
   def schedule_processes(scheduler = %InteractingScheduler{}) do
 
-    Logger.info("[InteractingScheduler] setting up work for #{scheduler.module}, queue length: #{length(scheduler.queue)}")
+    Logger.debug("[InteractingScheduler] setting up work for #{scheduler.module}, queue length: #{length(scheduler.queue)}")
 
     avail_workers = MapSet.difference(scheduler.processes, scheduler.busy_processes)
 
@@ -49,27 +71,9 @@ defmodule InteractingScheduler do
     end)
     |> Enum.unzip
 
+    Logger.debug("[InteractingScheduler] #{scheduler.module} executing #{length(used_pids)} workers")
+
     scheduler = %{ scheduler | busy_processes: MapSet.union(scheduler.busy_processes, MapSet.new(used_pids)) }
-
-    receive do
-      {:answer, result, worker_pid} ->
-        Logger.info("[InteractingScheduler] answer from #{scheduler.module}")
-
-        scheduler = %{ scheduler | busy_processes: MapSet.delete(scheduler.busy_processes, worker_pid) }
-        send scheduler.client_pid, {:answer, scheduler.module, result}
-        if MapSet.size(scheduler.busy_processes) == 0 and length(scheduler.queue) == 0  do
-          send scheduler.client_pid, {:queue_drain, scheduler.module}
-        end
-        schedule_processes(scheduler)
-      {:push_queue, work_item} ->
-        Logger.info("[InteractingScheduler] pushed work for #{scheduler.module}")
-        scheduler = %{ scheduler | queue: [work_item | scheduler.queue] }
-        schedule_processes(scheduler)
-      #anything ->
-        #Logger.info("[InteractingScheduler] received #{inspect(anything)}")
-        #schedule_processes(scheduler)
-
-    end
 
   end
 

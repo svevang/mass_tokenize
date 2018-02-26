@@ -5,12 +5,12 @@ defmodule TokenizeWikiExtractorJson do
 
   require Logger
 
-  def parse_string(scheduler) do
-    send scheduler, {:ready, self() }
+  def parse_string(client, uid) do
+    send client, {:ready, self() }
     receive do
       {:work, string, client} ->
-        send client, {:answer, parse_json(string) , self() }
-        parse_string(scheduler)
+        send client, {:answer, uid, parse_json(string) , self() }
+        parse_string(client, uid)
       { :shutdown } ->
         exit(:normal)
     end
@@ -19,12 +19,9 @@ defmodule TokenizeWikiExtractorJson do
 
   def parse_json(string) do
 
-    {:ok, stream} =
-      string
-       |> StringIO.open()
-
-    stream
-    |> IO.binstream(:line)
+    string
+    |> String.trim
+    |> String.split("\n")
     |> Enum.map( fn(line) -> Poison.decode!(line) end )
     |> Enum.map(fn(json) -> 
       {:ok, tokens } = Tokenize.rust_tokenize(json["text"])
