@@ -1,8 +1,6 @@
 defmodule TokenizeWikiextractorJsonTest do
   use ExUnit.Case
 
-  import TokenizeWikiExtractorJson, only: [parse_json: 1]
-
   test "should parse a file of line delimited json objects" do
     s = File.read!(Path.join(__DIR__, "../test/fixtures/wiki_00"))
 
