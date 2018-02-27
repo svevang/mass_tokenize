@@ -9,6 +9,13 @@ defmodule MassTokenize do
   require Logger
   import ExProf.Macro
 
+  def print_result_list(results) do
+    results
+    |> Enum.uniq
+    |> Enum.map(fn(s) -> [s, '\n'] end)
+    |> IO.write
+  end
+
   def run_queues(file_reader_scheduler, wiki_extractor_tokenizer) do
 
     if InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(wiki_extractor_tokenizer) do
@@ -31,8 +38,8 @@ defmodule MassTokenize do
         run_queues(file_reader_scheduler, wiki_extractor_tokenizer)
       {:answer, ^wiki_extractor_uid, result, worker_pid} ->
         wiki_extractor_tokenizer = InteractingScheduler.receive_answer(wiki_extractor_tokenizer, result, worker_pid)
+        print_result_list(result)
         Logger.debug("[MassTokenize] answer from TokenizeWikiExtractorJson #{wiki_extractor_uid}")
-        #IO.puts(result)
         run_queues(file_reader_scheduler, wiki_extractor_tokenizer)
       anything ->
         Logger.debug("[MassTokenize] received #{inspect(anything)}")
