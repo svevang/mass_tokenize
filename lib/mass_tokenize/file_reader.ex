@@ -4,9 +4,8 @@ defmodule FileReader do
   """
 
   def read_text(client, uid) do
-    send client, {:ready, self() }
     receive do
-      {:work, path, client} ->
+      {:work, path} ->
         send client, {:answer, uid, read_file(path), self() }
         read_text(client, uid)
       { :shutdown } ->

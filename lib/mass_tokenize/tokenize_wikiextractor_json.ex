@@ -6,9 +6,8 @@ defmodule TokenizeWikiExtractorJson do
   require Logger
 
   def parse_string(client, uid) do
-    send client, {:ready, self() }
     receive do
-      {:work, string, client} ->
+      {:work, string} ->
         send client, {:answer, uid, parse_json(string) , self() }
         parse_string(client, uid)
       { :shutdown } ->

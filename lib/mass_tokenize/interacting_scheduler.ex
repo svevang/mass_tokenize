@@ -55,14 +55,13 @@ defmodule InteractingScheduler do
     work_batch = Enum.take(scheduler.queue, MapSet.size(avail_workers))
     scheduler = %{ scheduler | queue: Enum.drop(scheduler.queue, length(work_batch)) }
 
-    # Because we can add work after the queue is drained,
     # keep track of availible workers.
     # Gather a list of workers that will be assigned work:
     {used_pids, _} = avail_workers
     |> Enum.zip(work_batch)
     |> Enum.map(fn(zipped)->
       {pid, work_item} = zipped
-      send pid, {:work, work_item, self()}
+      send pid, {:work, work_item}
       zipped
     end)
     |> Enum.unzip

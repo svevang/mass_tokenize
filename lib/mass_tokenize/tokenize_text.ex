@@ -3,12 +3,11 @@ defmodule TokenizeText do
   A task for the InteractingScheduler: Parse one line of wikiextractor python script output.
   """
 
-  def parse_string(scheduler) do
-    send scheduler, {:ready, self() }
+  def parse_string(client, uid) do
     receive do
-      {:work, string, client} ->
+      {:work, string} ->
         send client, {:answer, do_tokenize(string) , self() }
-        parse_string(scheduler)
+        parse_string(client, uid)
       { :shutdown } ->
         exit(:normal)
     end
