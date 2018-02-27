@@ -66,7 +66,7 @@ defmodule InteractingScheduler do
     end)
     |> Enum.unzip
 
-    Logger.debug("[InteractingScheduler] #{scheduler.module} executing #{length(used_pids)} workers")
+    Logger.debug("[InteractingScheduler] #{scheduler.module} executing #{length(used_pids)} workers with #{MapSet.size(scheduler.busy_processes)} working.")
 
     scheduler = %{ scheduler | busy_processes: MapSet.union(scheduler.busy_processes, MapSet.new(used_pids)) }
 
