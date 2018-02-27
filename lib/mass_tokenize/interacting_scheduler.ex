@@ -10,11 +10,7 @@ defmodule InteractingScheduler do
   defstruct @enforce_keys
 
   def run(client_pid, num_processes, module, func, queue) do
-    InteractingScheduler.setup_queues(client_pid, num_processes, module, gen_key(), func, queue)
-  end
-
-  defp gen_key(length \\ 32) do
-    :crypto.strong_rand_bytes(length) |> Base.url_encode64 |> binary_part(0, length)
+    InteractingScheduler.setup_queues(client_pid, num_processes, module, gen_uid(), func, queue)
   end
 
   def setup_queues(client_pid, num_processes, module, uid, func, queue) do
@@ -76,5 +72,10 @@ defmodule InteractingScheduler do
     scheduler = %{ scheduler | busy_processes: MapSet.union(scheduler.busy_processes, MapSet.new(used_pids)) }
 
   end
+
+  defp gen_uid(length \\ 32) do
+    :crypto.strong_rand_bytes(length) |> Base.url_encode64 |> binary_part(0, length)
+  end
+
 
 end
