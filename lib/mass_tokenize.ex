@@ -16,9 +16,15 @@ defmodule MassTokenize do
     |> IO.write
   end
 
+  def finished?(file_reader_scheduler, wiki_extractor_tokenizer) do
+    InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(wiki_extractor_tokenizer)
+  end
+
   def run_queues(file_reader_scheduler, wiki_extractor_tokenizer) do
 
-    if InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(wiki_extractor_tokenizer) do
+    if finished?(file_reader_scheduler, wiki_extractor_tokenizer) do
+      # XXX fixme, wait for the printer tasks to finish
+      :timer.sleep(1000)
       exit(:normal)
     end
 
@@ -38,7 +44,7 @@ defmodule MassTokenize do
         run_queues(file_reader_scheduler, wiki_extractor_tokenizer)
       {:answer, ^wiki_extractor_uid, result, worker_pid} ->
         wiki_extractor_tokenizer = InteractingScheduler.receive_answer(wiki_extractor_tokenizer, result, worker_pid)
-        print_result_list(result)
+        Task.start_link(fn -> print_result_list(result) end)
         Logger.debug("[MassTokenize] answer from TokenizeWikiExtractorJson #{wiki_extractor_uid}")
         run_queues(file_reader_scheduler, wiki_extractor_tokenizer)
       anything ->
