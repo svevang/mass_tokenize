@@ -20,6 +20,13 @@ defmodule MassTokenize do
     InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(tokenizer_scheduler)
   end
 
+  def objective(file_reader_scheduler, tokenizer_scheduler) do
+    if length(tokenizer_scheduler.queue) < 16 do
+      file_reader_scheduler = InteractingScheduler.schedule_processes(file_reader_scheduler)
+    end
+    file_reader_scheduler
+  end
+
   def run_queues(file_reader_scheduler, tokenizer_scheduler) do
 
     if finished?(file_reader_scheduler, tokenizer_scheduler) do
@@ -28,9 +35,8 @@ defmodule MassTokenize do
       exit(:normal)
     end
 
-    if length(tokenizer_scheduler.queue) < 16 do
-      file_reader_scheduler = InteractingScheduler.schedule_processes(file_reader_scheduler)
-    end
+    # throttle the first step in the pipeline based on the subsequent step's queue length
+    file_reader_scheduler = objective(file_reader_scheduler, tokenizer_scheduler)
     tokenizer_scheduler = InteractingScheduler.schedule_processes(tokenizer_scheduler)
 
     file_reader_uid = file_reader_scheduler.uid
