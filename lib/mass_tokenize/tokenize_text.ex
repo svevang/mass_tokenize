@@ -6,7 +6,7 @@ defmodule TokenizeText do
   def parse_string(client, uid) do
     receive do
       {:work, string} ->
-        send client, {:answer, do_tokenize(string) , self() }
+        send client, {:answer, uid, do_tokenize(string) , self() }
         parse_string(client, uid)
       { :shutdown } ->
         exit(:normal)
