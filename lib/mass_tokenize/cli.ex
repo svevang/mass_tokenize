@@ -26,7 +26,7 @@ defmodule MassTokenize.CLI do
       Print this help:                   $ mass_tokenize --help
 
     Options:
-      --wikiextractor-json  Assume the input format is wikiextract line-oriented json objects
+      --wikiextractor-json  Assume the input format is wikiextractor line-oriented json objects
       --help/-h             Print this help
 
     """
