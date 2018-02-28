@@ -50,6 +50,7 @@ defmodule MassTokenize do
         run_queues(file_reader_scheduler, tokenizer_scheduler)
       {:answer, ^wiki_extractor_uid, result, worker_pid} ->
         tokenizer_scheduler = InteractingScheduler.receive_answer(tokenizer_scheduler, result, worker_pid)
+        # TODO need a proper 3rd pipeline step for printing results
         Task.start_link(fn -> print_result_list(result) end)
         Logger.debug("[MassTokenize] answer from TokenizeWikiExtractorJson #{wiki_extractor_uid}")
         run_queues(file_reader_scheduler, tokenizer_scheduler)
