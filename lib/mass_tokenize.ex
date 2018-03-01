@@ -21,10 +21,11 @@ defmodule MassTokenize do
   end
 
   def objective(file_reader_scheduler, tokenizer_scheduler) do
-    if length(tokenizer_scheduler.queue) < (2 * @num_tok_workers) do
+    file_reader_scheduler = if length(tokenizer_scheduler.queue) < (2 * @num_tok_workers) do
       file_reader_scheduler = InteractingScheduler.schedule_processes(file_reader_scheduler)
+    else
+      file_reader_scheduler
     end
-    file_reader_scheduler
   end
 
   def run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
