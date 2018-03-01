@@ -16,8 +16,8 @@ defmodule MassTokenize do
     |> IO.write
   end
 
-  def finished?(file_reader_scheduler, tokenizer_scheduler) do
-    InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(tokenizer_scheduler)
+  def finished?(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
+    InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(tokenizer_scheduler) and InteractingScheduler.queue_drained?(output_scheduler)
   end
 
   def objective(file_reader_scheduler, tokenizer_scheduler) do
@@ -27,36 +27,42 @@ defmodule MassTokenize do
     file_reader_scheduler
   end
 
-  def run_queues(file_reader_scheduler, tokenizer_scheduler) do
+  def run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
 
-    if finished?(file_reader_scheduler, tokenizer_scheduler) do
-      # XXX fixme, wait for the printer tasks to finish
-      :timer.sleep(1000)
+    if finished?(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
       exit(:normal)
     end
 
     # throttle the first step in the pipeline based on the subsequent step's queue length
     file_reader_scheduler = objective(file_reader_scheduler, tokenizer_scheduler)
     tokenizer_scheduler = InteractingScheduler.schedule_processes(tokenizer_scheduler)
+    output_scheduler = InteractingScheduler.schedule_processes(output_scheduler)
 
     file_reader_uid = file_reader_scheduler.uid
     wiki_extractor_uid = tokenizer_scheduler.uid
+    output_writer_uid = output_scheduler.uid
 
     receive do
       {:answer, ^file_reader_uid, result, worker_pid} ->
-        file_reader_scheduler = InteractingScheduler.receive_answer(file_reader_scheduler, result, worker_pid)
         Logger.debug("[MassTokenize] answer from FileReader #{file_reader_uid}")
+        file_reader_scheduler = InteractingScheduler.receive_answer(file_reader_scheduler, result, worker_pid)
+
         tokenizer_scheduler = InteractingScheduler.push_queue(tokenizer_scheduler, result)
-        run_queues(file_reader_scheduler, tokenizer_scheduler)
+        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
       {:answer, ^wiki_extractor_uid, result, worker_pid} ->
-        tokenizer_scheduler = InteractingScheduler.receive_answer(tokenizer_scheduler, result, worker_pid)
-        # TODO need a proper 3rd pipeline step for printing results
-        Task.start_link(fn -> print_result_list(result) end)
         Logger.debug("[MassTokenize] answer from TokenizeWikiExtractorJson #{wiki_extractor_uid}")
-        run_queues(file_reader_scheduler, tokenizer_scheduler)
+        tokenizer_scheduler = InteractingScheduler.receive_answer(tokenizer_scheduler, result, worker_pid)
+
+        output_scheduler = InteractingScheduler.push_queue(output_scheduler, result)
+        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
+      {:answer, ^output_writer_uid, result, worker_pid} ->
+        Logger.debug("[MassTokenize] answer from OutputWriter #{output_writer_uid}")
+        output_scheduler = InteractingScheduler.receive_answer(output_scheduler, result, worker_pid)
+
+        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
       anything ->
         Logger.debug("[MassTokenize] received #{inspect(anything)}")
-        run_queues(file_reader_scheduler, tokenizer_scheduler)
+        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
     end
 
   end
@@ -76,8 +82,9 @@ defmodule MassTokenize do
 
     file_reader_scheduler = InteractingScheduler.run(self(), @num_file_workers, FileReader, :read_text, file_list)
     tokenizer_scheduler = start_tokenizer_scheduler(wikiextractor_json: json_lines)
+    output_scheduler = InteractingScheduler.run(self(), @num_tok_workers, StdoutWriter, :print, [])
 
-    run_queues(file_reader_scheduler, tokenizer_scheduler)
+    run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
   end
 
   def gather_tree(dir, results) do
