@@ -16,7 +16,6 @@ defmodule StdoutWriter do
 
   def do_print(result_list) do
     result_list
-    |> Enum.uniq
     |> Enum.map(fn(s) -> [s, '\n'] end)
     |> IO.write
     {:ok}
