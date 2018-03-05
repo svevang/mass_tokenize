@@ -9,11 +9,25 @@ defmodule InteractingScheduler do
   @enforce_keys [:client_pid, :module, :uid, :processes, :busy_processes, :queue]
   defstruct @enforce_keys
 
+  @doc """
+  Main entry point for a new interacting scheduler.
+
+  ## Examples
+
+  iex> scheduler = InteractingScheduler.run(self(), 2, StdoutWriter, :print, [])
+  iex> scheduler.queue
+  []
+  iex> MapSet.size(scheduler.busy_processes)
+  0
+  iex> scheduler.__struct__
+  InteractingScheduler
+  """
+
   def run(client_pid, num_processes, module, func, queue) do
-    InteractingScheduler.setup_queues(client_pid, num_processes, module, gen_uid(), func, queue)
+    setup_queues(client_pid, num_processes, module, gen_uid(), func, queue)
   end
 
-  def setup_queues(client_pid, num_processes, module, uid, func, queue) do
+  defp setup_queues(client_pid, num_processes, module, uid, func, queue) do
     processes = (1..num_processes)
     |> Enum.map(fn(_) -> spawn(module, func, [self(), uid]) end)
 

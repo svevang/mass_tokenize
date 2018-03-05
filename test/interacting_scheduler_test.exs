@@ -12,6 +12,7 @@ end
 
 defmodule InteractingSchedulerTest do
   use ExUnit.Case
+  doctest InteractingScheduler
 
   setup [:create_scheduler]
 
