@@ -29,6 +29,23 @@ defmodule InteractingSchedulerTest do
     end
   end
 
+  describe "#queue_drained?" do
+    setup [:create_scheduler]
+    test "a newly created queue with work items is not drained", context do
+      scheduler = context[:scheduler]
+      assert length(scheduler.queue) > 0
+      refute InteractingScheduler.queue_drained?(scheduler)
+    end
+
+    test "an empty queue with no busy workers is drained", context do
+      scheduler = context[:scheduler]
+      scheduler =  %{ scheduler | queue: [] }
+      assert length(scheduler.queue) == 0
+      assert MapSet.size(scheduler.busy_processes) == 0
+      assert InteractingScheduler.queue_drained?(scheduler)
+    end
+  end
+
   describe "#push_queue" do
     setup [:create_scheduler]
     test "should add work items to the queue", context do
