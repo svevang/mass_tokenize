@@ -12,6 +12,15 @@ Eventually this list of words will become a
 [trie](https://en.wikipedia.org/wiki/Trie) of all the words in the
 Wikipedia.
 
+### GenServer
+
+Likely you're going to want to run, not walk, over to
+[Genserver](https://hexdocs.pm/elixir/GenServer.html) before using this.
+The implementation of the `MassTokenize` module implements a lot of
+machinery that `GenServer` takes care of. See also
+[GenStage](https://github.com/elixir-lang/gen_stage) and
+[Flow](https://github.com/elixir-lang/flow)
+
 ## Elixir!
 
 Welcome to the world of Elixir (Erlang)!
@@ -152,7 +161,7 @@ The receive block was factored out of the `Scheduler` and is now part of
 the main program loop. (If you dont know what a receive block is,
 basically it's how Erlang and [Elixir communicate between
 processes](https://elixir-lang.org/getting-started/processes.html#send-and-receive)).
-This allows MassTokenize to act as a router for pipeline events. When
+The MassTokenize module acts as a router for pipeline events. When
 we receive messages from one step in the pipeline, we pass them onward
 to the next step. There is a little bookkeeping involved: you must call
 `InteractingScheduler.receive_answer` whenever a worker returns an
