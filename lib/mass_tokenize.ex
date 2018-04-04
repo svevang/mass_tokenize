@@ -1,91 +1,25 @@
-defmodule MassTokenize do
-  @moduledoc """
-  Documentation for MassTokenize.
-  """
+defmodule FileListProducer do
+  use GenStage
 
-  @num_file_workers 2
-  @num_tok_workers 9
-
-  require Logger
-  import ExProf.Macro
-
-  def print_result_list(results) do
-    results
-    |> Enum.uniq
-    |> Enum.map(fn(s) -> [s, '\n'] end)
-    |> IO.write
+  def start_link(path) do
+    GenStage.start_link(__MODULE__, path, name: __MODULE__)
   end
 
-  def finished?(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
-    InteractingScheduler.queue_drained?(file_reader_scheduler) and InteractingScheduler.queue_drained?(tokenizer_scheduler) and InteractingScheduler.queue_drained?(output_scheduler)
-  end
+  def init(path) do
 
-  def objective(file_reader_scheduler, tokenizer_scheduler) do
-    file_reader_scheduler = if length(tokenizer_scheduler.queue) < (2 * @num_tok_workers) do
-      file_reader_scheduler = InteractingScheduler.schedule_processes(file_reader_scheduler)
-    else
-      file_reader_scheduler
-    end
-  end
-
-  def run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
-
-    if finished?(file_reader_scheduler, tokenizer_scheduler, output_scheduler) do
-      exit(:normal)
-    end
-
-    # throttle the first step in the pipeline based on the subsequent step's queue length
-    file_reader_scheduler = objective(file_reader_scheduler, tokenizer_scheduler)
-    tokenizer_scheduler = InteractingScheduler.schedule_processes(tokenizer_scheduler)
-    output_scheduler = InteractingScheduler.schedule_processes(output_scheduler)
-
-    file_reader_uid = file_reader_scheduler.uid
-    wiki_extractor_uid = tokenizer_scheduler.uid
-    output_writer_uid = output_scheduler.uid
-
-    receive do
-      {:answer, ^file_reader_uid, result, worker_pid} ->
-        Logger.debug("[MassTokenize] answer from FileReader #{file_reader_uid}")
-        file_reader_scheduler = InteractingScheduler.receive_answer(file_reader_scheduler, result, worker_pid)
-
-        tokenizer_scheduler = InteractingScheduler.push_queue(tokenizer_scheduler, result)
-        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
-      {:answer, ^wiki_extractor_uid, result, worker_pid} ->
-        Logger.debug("[MassTokenize] answer from TokenizeWikiExtractorJson #{wiki_extractor_uid}")
-        tokenizer_scheduler = InteractingScheduler.receive_answer(tokenizer_scheduler, result, worker_pid)
-
-        output_scheduler = InteractingScheduler.push_queue(output_scheduler, result)
-        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
-      {:answer, ^output_writer_uid, result, worker_pid} ->
-        Logger.debug("[MassTokenize] answer from OutputWriter #{output_writer_uid}")
-        output_scheduler = InteractingScheduler.receive_answer(output_scheduler, result, worker_pid)
-
-        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
-      anything ->
-        Logger.debug("[MassTokenize] received #{inspect(anything)}")
-        run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
-    end
-
-  end
-
-  def start_tokenizer_scheduler(wikiextractor_json: false) do
-    tokenizer_scheduler = InteractingScheduler.run(self(), @num_tok_workers, TokenizeText, :parse_string, [])
-  end
-
-  def start_tokenizer_scheduler(wikiextractor_json: true) do
-    tokenizer_scheduler = InteractingScheduler.run(self(), @num_tok_workers, TokenizeWikiExtractorJson, :parse_string, [])
-  end
-
-  def tokenize_text_files([path: dir, wikiextractor_json: json_lines]) do
-
-    file_list = gather_tree(dir, [])
+    file_list = gather_tree(path, [])
     |> List.flatten
 
-    file_reader_scheduler = InteractingScheduler.run(self(), @num_file_workers, FileReader, :read_text, file_list)
-    tokenizer_scheduler = start_tokenizer_scheduler(wikiextractor_json: json_lines)
-    output_scheduler = InteractingScheduler.run(self(), @num_tok_workers, StdoutWriter, :print, [])
+    {:producer, file_list}
+  end
 
-    run_queues(file_reader_scheduler, tokenizer_scheduler, output_scheduler)
+  def handle_demand(demand, file_list) do
+    # If the counter is 3 and we ask fo r 2 items, we will
+    # emit the items 3 and 4, and set the state to 5.
+    work_batch = Enum.take(file_list, demand)
+    file_list = Enum.drop(file_list, demand)
+
+    {:noreply, work_batch, file_list}
   end
 
   def gather_tree(dir, results) do
@@ -95,10 +29,105 @@ defmodule MassTokenize do
       if File.dir?(fname) do
         gather_tree(fname, results)
       else
-        [ fname |results ]
+        [ fname | results ]
       end
 
     end)
+  end
+end
+
+defmodule FileReaderConsumer do
+  use GenStage
+
+  def start_link(:ok) do
+    GenStage.start_link(__MODULE__, :ok)
+  end
+
+  def init(:ok) do
+    {:producer_consumer, []}
+  end
+
+  def handle_events(file_paths, _from, state) do
+    files = file_paths
+            |> Enum.map(fn(path)-> FileReader.read_file(path) end)
+    {:noreply, files, state}
+  end
+end
+
+defmodule TokenizerConsumer do
+  use GenStage
+
+  def start_link(:ok) do
+    GenStage.start_link(__MODULE__, :ok)
+  end
+
+  # Callbacks
+
+  def init(:ok) do
+    {:producer_consumer, []}
+  end
+
+  def handle_events(files, _from, state) do
+    token_lists = files
+    |> Enum.map(fn(s) -> TokenizeWikiExtractorJson.parse_json(s) end)
+    {:noreply, token_lists, state}
+  end
+end
+
+defmodule ResultConsumer do
+  use GenStage
+
+  def start_link(:ok) do
+    GenStage.start_link(__MODULE__, :ok)
+  end
+
+  # Callbacks
+
+  def init(:ok) do
+    {:consumer, []}
+  end
+
+  def handle_events(results, _from, state) do
+      results
+      |> Enum.map(fn(r) -> StdoutWriter.do_write(r) end)
+    {:noreply, [], state}
+  end
+end
+
+
+defmodule MassTokenize do
+  @num_file_workers 2
+  @num_tok_workers 9
+
+  def init([path: dir, wikiextractor_json: json_lines]) do
+    import Supervisor.Spec
+
+    {:ok, file_producer} = GenStage.start_link(FileListProducer, [dir])
+
+    file_readers = 1..@num_file_workers
+                     |> Enum.map(fn(_)-> 
+                       {:ok, file_reader} = GenStage.start_link(FileReaderConsumer, :ok)
+                       file_reader
+                     end)
+
+    tokenizers = 1..@num_tok_workers
+    |> Enum.map(fn(i) ->
+      reader = Enum.at(file_readers, rem(i, @num_file_workers))
+      {:ok, tokenize_consumer} = GenStage.start_link(TokenizerConsumer, :ok)
+      GenStage.sync_subscribe(tokenize_consumer, to: reader, min_demand: 1, max_demand: 10)
+      {:ok, printer} = GenStage.start_link(ResultConsumer, :ok)
+      GenStage.sync_subscribe(printer, to: tokenize_consumer)
+      tokenize_consumer
+    end)
+
+    file_readers
+    |> Enum.map(fn(file_reader)-> 
+      GenStage.sync_subscribe(file_reader, to: file_producer, min_demand: 1, max_demand: 2)
+    end)
+
+    Process.sleep(:infinity)
+
+    #Supervisor.start_link(children, strategy: :one_for_one)
   end
 
 end

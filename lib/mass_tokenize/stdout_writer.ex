@@ -3,18 +3,7 @@ defmodule StdoutWriter do
   A task for the InteractingScheduler: Print an IOList of output
   """
 
-  def print(client, uid) do
-    receive do
-      {:work, result_list} ->
-        send client, {:answer, uid, do_print(result_list), self() }
-        print(client, uid)
-      { :shutdown } ->
-        exit(:normal)
-    end
-
-  end
-
-  def do_print(result_list) do
+  def do_write(result_list) do
     result_list
     |> Enum.map(fn(s) -> [s, '\n'] end)
     |> IO.write

@@ -23,6 +23,7 @@ defmodule MassTokenize.MixProject do
     [
       {:exprof, "~> 0.2.0"},
       {:poison, "~> 3.1"},
+      {:gen_stage, "~> 0.12"},
       {:tokenize, github: "svevang/elixir-tokenize"}
     ]
   end

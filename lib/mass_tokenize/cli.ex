@@ -33,7 +33,8 @@ defmodule MassTokenize.CLI do
   end
 
   def process([path: some_path, wikiextractor_json: wikiextractor_json]) do
-    MassTokenize.tokenize_text_files([path: some_path, wikiextractor_json: wikiextractor_json])
+    {:ok, pid} = GenServer.start_link(MassTokenize, [path: some_path, wikiextractor_json: wikiextractor_json])
+    Process.sleep(:infinity)
   end
 
   def parse_args(argv) do
