@@ -14,8 +14,7 @@ defmodule FileListProducer do
   end
 
   def handle_demand(demand, file_list) do
-    # If the counter is 3 and we ask fo r 2 items, we will
-    # emit the items 3 and 4, and set the state to 5.
+
     work_batch = Enum.take(file_list, demand)
     file_list = Enum.drop(file_list, demand)
 
@@ -57,21 +56,30 @@ end
 defmodule TokenizerConsumer do
   use GenStage
 
-  def start_link(:ok) do
-    GenStage.start_link(__MODULE__, :ok)
+  def start_link(wikiextractor_json: json_lines) do
+    GenStage.start_link(__MODULE__, wikiextractor_json: json_lines)
   end
 
   # Callbacks
 
-  def init(:ok) do
-    {:producer_consumer, []}
+  def init(wikiextractor_json: json_lines) do
+    {:producer_consumer, [wikiextractor_json: json_lines]}
   end
 
   def handle_events(files, _from, state) do
     token_lists = files
-    |> Enum.map(fn(s) -> TokenizeWikiExtractorJson.parse_json(s) end)
+    |> Enum.map(fn(s) -> tokenize(s, state[:wikiextractor_json]) end)
     {:noreply, token_lists, state}
   end
+
+  def tokenize(str, is_json) do
+    if is_json do
+      TokenizeWikiExtractorJson.parse_json(str)
+    else
+      TokenizeText.do_tokenize(str)
+    end
+  end
+
 end
 
 defmodule ResultConsumer do
@@ -113,7 +121,7 @@ defmodule MassTokenize do
     tokenizers = 1..@num_tok_workers
     |> Enum.map(fn(i) ->
       reader = Enum.at(file_readers, rem(i, @num_file_workers))
-      {:ok, tokenize_consumer} = GenStage.start_link(TokenizerConsumer, :ok)
+      {:ok, tokenize_consumer} = GenStage.start_link(TokenizerConsumer, wikiextractor_json: json_lines)
       GenStage.sync_subscribe(tokenize_consumer, to: reader, min_demand: 1, max_demand: 10)
       {:ok, printer} = GenStage.start_link(ResultConsumer, :ok)
       GenStage.sync_subscribe(printer, to: tokenize_consumer)
