@@ -21,6 +21,9 @@ machinery that `GenServer` takes care of. See also
 [GenStage](https://github.com/elixir-lang/gen_stage) and
 [Flow](https://github.com/elixir-lang/flow)
 
+There's a WIP implementation of this using GenStage here:
+https://github.com/svevang/mass_tokenize/tree/feature/use-genstage
+
 ## Elixir!
 
 Welcome to the world of Elixir (Erlang)!
