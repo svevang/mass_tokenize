@@ -171,8 +171,8 @@ answer. This lets the scheduler know which workers are idle.
 
 The goal of our objective function is to minimize our program's memory
 usage. We call the objective function and decide to add work to the
-pipeline (or not).  We monitor subsequent pipeline queues and [make sure
-_that_ queue is
+pipeline (or not).  We monitor queue length across subsequent iterations
+and [make sure our queue is
 bounded](https://github.com/svevang/mass_tokenize/blob/master/lib/mass_tokenize.ex#L39).
 
 To verify that our objective function is working, we can install
