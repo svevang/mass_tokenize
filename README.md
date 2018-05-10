@@ -49,19 +49,6 @@ $ mix deps.get
 $ mix compile
 ```
 
-If you're interested in using the Wikipedia as a data source, download
-the latest dump:
-
-```
-$ wget -np -r --accept-regex
-'https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles[0-27].*.bz2'
-https://dumps.wikimedia.org/enwiki/latest/
-```
-
-And then follow the instructions over at
-[wikiextractor](https://github.com/attardi/wikiextractor) to extract the
-cleaned up json output.
-
 ## Usage
 
 Basic usage information is provided by the CLI module:
@@ -108,12 +95,17 @@ Herman
 ```
 
 ### Tokenizing Wikiextractor Json Output
+If you're interested in using the Wikipedia as a data source, download
+the latest dump:
 
-Wikiextractor is a useful tool for preprocessing Wikipedia dumps.
+```
+$ wget -np -r --accept-regex 'https://dumps.wikimedia.org/enwiki/latest/enwiki-latest-pages-articles[0-27].*.bz2' https://dumps.wikimedia.org/enwiki/latest/
+```
+
+[wikiextractor](https://github.com/attardi/wikiextractor) is a useful tool for preprocessing Wikipedia dumps.
 MassTokenize understands the JSON formatted dump structure that
 Wikiextractor uses. To try this out, download and run the Wikiextractor
 tool on an enwiki dump:
-
 
 ```
 $ WikiExtractor.py --json -o /tmp/text <some enwiki-dump>
